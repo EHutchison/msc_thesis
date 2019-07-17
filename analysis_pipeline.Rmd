@@ -1,0 +1,190 @@
+---
+title: "Untitled"
+author: "Me"
+date: "17/04/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(viridis)
+library(psych)
+library(Hmisc)
+library(purrr)
+library(dplyr)
+library(car)
+library(Hmisc)
+library(corrplot)
+library(lm.beta)
+library(ggcorrplot)
+library(pwr)
+```
+Load data
+```{r}
+load("beth_full_data.RData")
+```
+Get rid of incomplete data points
+```{r}
+complete_iNOD <- na.omit(iNOD)
+
+complete_RCADS_GAD <- na.omit(RCADS_GAD)
+
+complete_SCI <- na.omit(SCI)
+
+complete_SM1 <- na.omit(SM1)
+
+complete_SM2 <- na.omit(SM2)
+
+
+completed_measures <- inner_join(complete_iNOD, complete_RCADS_GAD, by="user_id") %>%
+  inner_join(complete_SCI, by="user_id")%>%
+  inner_join(complete_SM1, by="user_id")%>%
+  inner_join(complete_SM2, by="user_id")%>%
+  inner_join(pinfo, by="user_id")
+```
+Get age and gender demographics
+```{r}
+numppts <- nrow(completed_measures)
+
+age <- completed_measures%>%
+   summarise(
+    avg_age = mean(age, na.rm=TRUE),
+    sd_age = sd(age, na.rm=TRUE),
+    minage = min(age, na.rm=TRUE),
+    maxage = max(age, na.rm=TRUE)
+  )
+
+sum(is.na(completed_measures$age))
+
+sex <- completed_measures %>%
+  group_by(sex)%>%
+  count()
+```
+Mean, sd, range for measures
+```{r}
+
+anxiety <- completed_measures %>%
+  summarise(
+    avg = mean(RCADS_GAD_total), 
+    sd = sd(RCADS_GAD_total), 
+    min = min(RCADS_GAD_total), 
+    max = max(RCADS_GAD_total)
+  )
+
+
+sleep <- completed_measures%>%
+   summarise(
+    avg = mean(SCI_total), 
+    sd = sd(SCI_total), 
+    min = min(SCI_total), 
+    max = max(SCI_total)
+  )
+
+obligation<- completed_measures%>%
+   summarise(
+    avg = mean(obligation_total), 
+    sd = sd(obligation_total), 
+    min = min(obligation_total), 
+    max = max(obligation_total)
+  )
+
+disengage <- completed_measures%>%
+  summarise(
+    avg = mean(disengage_total), 
+    sd = sd(disengage_total), 
+    min = min(disengage_total), 
+    max = max(disengage_total)
+  )
+
+
+socm1<- completed_measures%>%
+  summarise(
+    avg = mean(SM1_total), 
+    sd = sd(SM1_total), 
+    min = min(SM1_total), 
+    max = max(SM1_total)
+  )
+
+socm2<- completed_measures%>%
+  summarise(
+    avg = mean(SM2_total), 
+    sd = sd(SM2_total), 
+    min = min(SM2_total), 
+    max = max(SM2_total)
+  )
+
+
+```
+Correlations
+```{r}
+scores<- completed_measures%>%
+  dplyr::select(ends_with("_total"))
+ 
+corr_matrix <- corr.test(scores, adjust = "none")
+ p_values <- corr_matrix[["p"]] %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "V1") %>%
+  gather("V2", "p", disengage_total:SM2_total)
+ 
+ggplot(p_values, aes(V1, V2, fill=p)) +
+  geom_tile(aes(fill=p))+
+  scale_fill_viridis()+
+  geom_text(aes(label=paste(round(p,3))))+
+  theme(axis.text.x=element_text(angle=90))
+ 
+corrs <- cor(scores)
+
+corrplot(corrs, type="upper", order="hclust",
+         addCoef.col = "black",
+         tl.col="black", tl.srt=45)
+```
+Model comparison 
+```{r}
+
+fit_sleep <- lm(SCI_total ~obligation_total + disengage_total + SM1_total + SM2_total, data=scores)
+summary(fit_sleep)
+
+fit_GAD <- lm(RCADS_GAD_total ~ obligation_total + disengage_total + SM1_total + SM2_total, data=scores)
+summary(fit_GAD)
+
+SM1_iNOD <- lm(SM1_total ~ obligation_total + disengage_total, data=scores)
+summary(SM1_iNOD)
+
+SM2_iNOD <- lm(SM2_total ~ obligation_total + disengage_total, data=scores)
+summary(SM2_iNOD)
+
+fit_GAD_beta <- lm.beta(fit_GAD)
+fit_GAD_beta
+
+fit_sleep_beta <- lm.beta(fit_sleep)
+fit_sleep_beta
+
+sm1_beta<- lm.beta(SM1_iNOD)
+
+sm2_beta <- lm.beta(SM2_iNOD)
+sm2_beta
+
+
+GAD_step<- step(fit_GAD)
+summary(GAD_step)
+
+
+sleep_step <- step(fit_sleep)
+summary(sleep_step)
+
+
+```
+```
+multicollinearity 
+```{r}
+vif(fit_sleep)
+vif(fit_GAD)
+```
+perc sleep
+```{r}
+sleep_issue <- scores%>%
+  filter(SCI_total<=17)
+
+(109/423)*100
+```
