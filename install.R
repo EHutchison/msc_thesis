@@ -1,0 +1,12 @@
+install.packages("tidyverse")
+install.packages("viridis")
+install.packages("psych")
+install.packages("Hmisc")
+install.packages("purrr")
+install.packages("dplyr")
+install.packages("car")
+install.packages("Hmisc")
+install.packages("corrplot")
+install.packages("lm.beta")
+install.packages("ggcorrplot")
+
